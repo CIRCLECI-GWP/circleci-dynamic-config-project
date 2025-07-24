@@ -108,31 +108,31 @@ jobs:
               curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
                 --header "Content-Type: application/vnd.api+json" \
                 --request PATCH \
-                --data '{
-                  "data": {
-                    "type":"vars",
-                    "attributes": {
-                       "value":"'"'"'\$CLUSTER_NAME'"'"'"
+                --data "{
+                  \"data\": {
+                    \"type\":\"vars\",
+                    \"attributes\": {
+                       \"value\":\"\$CLUSTER_NAME\"
                     }
                   }
-                }' \
+                }" \
                 https://app.terraform.io/api/v2/workspaces/\$WORKSPACE_ID/vars/\$VAR_ID
             else
               curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
                 --header "Content-Type: application/vnd.api+json" \
                 --request POST \
-                --data '{
-                  "data": {
-                    "type":"vars",
-                    "attributes": {
-                      "key":"cluster_name",
-                      "value":"'"'"'\$CLUSTER_NAME'"'"'",
-                      "category":"terraform",
-                      "hcl":false,
-                      "sensitive":false
+                --data "{
+                  \"data\": {
+                    \"type\":\"vars\",
+                    \"attributes\": {
+                      \"key\":\"cluster_name\",
+                      \"value\":\"\$CLUSTER_NAME\",
+                      \"category\":\"terraform\",
+                      \"hcl\":false,
+                      \"sensitive\":false
                     }
                   }
-                }' \
+                }" \
                 https://app.terraform.io/api/v2/workspaces/\$WORKSPACE_ID/vars
             fi
             
@@ -144,31 +144,31 @@ jobs:
               curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
                 --header "Content-Type: application/vnd.api+json" \
                 --request PATCH \
-                --data '{
-                  "data": {
-                    "type":"vars",
-                    "attributes": {
-                       "value":"'"'"'\$K8S_SLUG'"'"'"
+                --data "{
+                  \"data\": {
+                    \"type\":\"vars\",
+                    \"attributes\": {
+                       \"value\":\"\$K8S_SLUG\"
                     }
                   }
-                }' \
+                }" \
                 https://app.terraform.io/api/v2/workspaces/\$WORKSPACE_ID/vars/\$VAR_ID
             else
               curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
                 --header "Content-Type: application/vnd.api+json" \
                 --request POST \
-                --data '{
-                  "data": {
-                    "type":"vars",
-                    "attributes": {
-                      "key":"do_k8s_slug_ver",
-                      "value":"'"'"'\$K8S_SLUG'"'"'",
-                      "category":"terraform",
-                      "hcl":false,
-                      "sensitive":false
+                --data "{
+                  \"data\": {
+                    \"type\":\"vars\",
+                    \"attributes\": {
+                      \"key\":\"do_k8s_slug_ver\",
+                      \"value\":\"\$K8S_SLUG\",
+                      \"category\":\"terraform\",
+                      \"hcl\":false,
+                      \"sensitive\":false
                     }
                   }
-                }' \
+                }" \
                 https://app.terraform.io/api/v2/workspaces/\$WORKSPACE_ID/vars
             fi
             
@@ -304,32 +304,32 @@ jobs:
               curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
                 --header "Content-Type: application/vnd.api+json" \
                 --request PATCH \
-                --data '{
-                  "data": {
-                    "type":"vars",
-                    "attributes": {
-                       "value":"'"'"'\$DIGITAL_OCEAN_TOKEN'"'"'",
-                       "sensitive": true
+                --data "{
+                  \"data\": {
+                    \"type\":\"vars\",
+                    \"attributes\": {
+                       \"value\":\"\$DIGITAL_OCEAN_TOKEN\",
+                       \"sensitive\": true
                     }
                   }
-                }' \
+                }" \
                 https://app.terraform.io/api/v2/workspaces/\$DEPLOYMENT_WORKSPACE_ID/vars/\$VAR_ID
             else
               curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
                 --header "Content-Type: application/vnd.api+json" \
                 --request POST \
-                --data '{
-                  "data": {
-                    "type":"vars",
-                    "attributes": {
-                      "key":"do_token",
-                      "value":"'"'"'\$DIGITAL_OCEAN_TOKEN'"'"'",
-                      "category":"terraform",
-                      "hcl":false,
-                      "sensitive":true
+                --data "{
+                  \"data\": {
+                    \"type\":\"vars\",
+                    \"attributes\": {
+                      \"key\":\"do_token\",
+                      \"value\":\"\$DIGITAL_OCEAN_TOKEN\",
+                      \"category\":\"terraform\",
+                      \"hcl\":false,
+                      \"sensitive\":true
                     }
                   }
-                }' \
+                }" \
                 https://app.terraform.io/api/v2/workspaces/\$DEPLOYMENT_WORKSPACE_ID/vars
             fi
             
@@ -341,31 +341,31 @@ jobs:
               curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
                 --header "Content-Type: application/vnd.api+json" \
                 --request PATCH \
-                --data '{
-                  "data": {
-                    "type":"vars",
-                    "attributes": {
-                       "value":"'"'"'\$CLUSTER_NAME'"'"'"
+                --data "{
+                  \"data\": {
+                    \"type\":\"vars\",
+                    \"attributes\": {
+                       \"value\":\"\$CLUSTER_NAME\"
                     }
                   }
-                }' \
+                }" \
                 https://app.terraform.io/api/v2/workspaces/\$DEPLOYMENT_WORKSPACE_ID/vars/\$VAR_ID
             else
               curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
                 --header "Content-Type: application/vnd.api+json" \
                 --request POST \
-                --data '{
-                  "data": {
-                    "type":"vars",
-                    "attributes": {
-                      "key":"cluster_name",
-                      "value":"'"'"'\$CLUSTER_NAME'"'"'",
-                      "category":"terraform",
-                      "hcl":false,
-                      "sensitive":false
+                --data "{
+                  \"data\": {
+                    \"type\":\"vars\",
+                    \"attributes\": {
+                      \"key\":\"cluster_name\",
+                      \"value\":\"\$CLUSTER_NAME\",
+                      \"category\":\"terraform\",
+                      \"hcl\":false,
+                      \"sensitive\":false
                     }
                   }
-                }' \
+                }" \
                 https://app.terraform.io/api/v2/workspaces/\$DEPLOYMENT_WORKSPACE_ID/vars
             fi
             
@@ -377,31 +377,31 @@ jobs:
               curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
                 --header "Content-Type: application/vnd.api+json" \
                 --request PATCH \
-                --data '{
-                  "data": {
-                    "type":"vars",
-                    "attributes": {
-                       "value":"'"'"'\$DOCKER_IMAGE'"'"'"
+                --data "{
+                  \"data\": {
+                    \"type\":\"vars\",
+                    \"attributes\": {
+                       \"value\":\"\$DOCKER_IMAGE\"
                     }
                   }
-                }' \
+                }" \
                 https://app.terraform.io/api/v2/workspaces/\$DEPLOYMENT_WORKSPACE_ID/vars/\$VAR_ID
             else
               curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
                 --header "Content-Type: application/vnd.api+json" \
                 --request POST \
-                --data '{
-                  "data": {
-                    "type":"vars",
-                    "attributes": {
-                      "key":"docker_image",
-                      "value":"'"'"'\$DOCKER_IMAGE'"'"'",
-                      "category":"terraform",
-                      "hcl":false,
-                      "sensitive":false
+                --data "{
+                  \"data\": {
+                    \"type\":\"vars\",
+                    \"attributes\": {
+                      \"key\":\"docker_image\",
+                      \"value\":\"\$DOCKER_IMAGE\",
+                      \"category\":\"terraform\",
+                      \"hcl\":false,
+                      \"sensitive\":false
                     }
                   }
-                }' \
+                }" \
                 https://app.terraform.io/api/v2/workspaces/\$DEPLOYMENT_WORKSPACE_ID/vars
             fi
 
@@ -429,15 +429,15 @@ jobs:
                   --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
                   --header "Content-Type: application/vnd.api+json" \
                   --request PATCH \
-                  --data '{
-                    "data": {
-                      "type":"vars",
-                      "attributes": {
-                         "value":"'"'"'\$VALUE'"'"'",
-                         "sensitive": true
+                  --data "{
+                    \"data\": {
+                      \"type\":\"vars\",
+                      \"attributes\": {
+                         \"value\":\"\$VALUE\",
+                         \"sensitive\": true
                       }
                     }
-                  }' \
+                  }" \
                   https://app.terraform.io/api/v2/workspaces/\$DEPLOYMENT_WORKSPACE_ID/vars/\$VAR_ID
               else
                 # Create variable
@@ -445,18 +445,18 @@ jobs:
                   --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
                   --header "Content-Type: application/vnd.api+json" \
                   --request POST \
-                  --data '{
-                    "data": {
-                      "type":"vars",
-                      "attributes": {
-                        "key":"'"'"'\$var'"'"'",
-                        "value":"'"'"'\$VALUE'"'"'",
-                        "category":"terraform",
-                        "hcl":false,
-                        "sensitive":true
+                  --data "{
+                    \"data\": {
+                      \"type\":\"vars\",
+                      \"attributes\": {
+                        \"key\":\"\$var\",
+                        \"value\":\"\$VALUE\",
+                        \"category\":\"terraform\",
+                        \"hcl\":false,
+                        \"sensitive\":true
                       }
                     }
-                  }' \
+                  }" \
                   https://app.terraform.io/api/v2/workspaces/\$DEPLOYMENT_WORKSPACE_ID/vars
               fi
             done

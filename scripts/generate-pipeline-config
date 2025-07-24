@@ -74,7 +74,7 @@ jobs:
       - terraform/init:
           path: ./terraform/do_create_k8s
       - run:
-          name: Create K8s Cluster on DigitalOcean 
+          name: Update Terraform Cloud variables for iac-do workspace
           command: |
             export CLUSTER_NAME=\${CIRCLE_PROJECT_REPONAME}
             export TAG=0.1.<< pipeline.number >>
@@ -163,7 +163,7 @@ jobs:
             # Wait for variable propagation
             sleep 10
       - run:
-          name: Terraform Apply (remote backend.)
+          name: Create K8s Cluster on DigitalOcean 
           command: |
             cd terraform/do_create_k8s
             terraform apply -auto-approve            

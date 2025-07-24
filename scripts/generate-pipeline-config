@@ -88,9 +88,21 @@ jobs:
             # Update Terraform Cloud workspace variables for iac-do workspace
             export TF_CLUSTER_WS=\${TF_CLUSTER_WORKSPACE:-"iac-do"}
             
+            # Get workspace ID from workspace name
+            WORKSPACE_ID=\$(curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
+              https://app.terraform.io/api/v2/organizations/CircleCI-Author-Program/workspaces/\$TF_CLUSTER_WS | \
+              jq -r '.data.id')
+            
+            if [ "\$WORKSPACE_ID" = "null" ] || [ -z "\$WORKSPACE_ID" ]; then
+              echo "ERROR: Could not find workspace '\$TF_CLUSTER_WS' in organization 'CircleCI-Author-Program'"
+              exit 1
+            fi
+            
+            echo "Found workspace ID: \$WORKSPACE_ID"
+            
             # Update cluster_name variable
             VAR_ID=\$(curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
-              https://app.terraform.io/api/v2/workspaces/\$TF_CLUSTER_WS/vars | \
+              https://app.terraform.io/api/v2/workspaces/\$WORKSPACE_ID/vars | \
               jq -r ".data // [] | .[] | select(.attributes.key==\"cluster_name\") | .id")
             if [ -n "\$VAR_ID" ]; then
               curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
@@ -104,7 +116,7 @@ jobs:
                     }
                   }
                 }' \
-                https://app.terraform.io/api/v2/workspaces/\$TF_CLUSTER_WS/vars/\$VAR_ID
+                https://app.terraform.io/api/v2/workspaces/\$WORKSPACE_ID/vars/\$VAR_ID
             else
               curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
                 --header "Content-Type: application/vnd.api+json" \
@@ -121,12 +133,12 @@ jobs:
                     }
                   }
                 }' \
-                https://app.terraform.io/api/v2/workspaces/\$TF_CLUSTER_WS/vars
+                https://app.terraform.io/api/v2/workspaces/\$WORKSPACE_ID/vars
             fi
             
             # Update do_k8s_slug_ver variable
             VAR_ID=\$(curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
-              https://app.terraform.io/api/v2/workspaces/\$TF_CLUSTER_WS/vars | \
+              https://app.terraform.io/api/v2/workspaces/\$WORKSPACE_ID/vars | \
               jq -r ".data // [] | .[] | select(.attributes.key==\"do_k8s_slug_ver\") | .id")
             if [ -n "\$VAR_ID" ]; then
               curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
@@ -140,7 +152,7 @@ jobs:
                     }
                   }
                 }' \
-                https://app.terraform.io/api/v2/workspaces/\$TF_CLUSTER_WS/vars/\$VAR_ID
+                https://app.terraform.io/api/v2/workspaces/\$WORKSPACE_ID/vars/\$VAR_ID
             else
               curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
                 --header "Content-Type: application/vnd.api+json" \
@@ -157,7 +169,7 @@ jobs:
                     }
                   }
                 }' \
-                https://app.terraform.io/api/v2/workspaces/\$TF_CLUSTER_WS/vars
+                https://app.terraform.io/api/v2/workspaces/\$WORKSPACE_ID/vars
             fi
             
             # Wait for variable propagation
@@ -269,12 +281,24 @@ jobs:
             # Export all required variables for the deployment workspace
             export TF_DEPLOYMENT_WS=\${TF_DEPLOYMENT_WORKSPACE:-"deploy-iac-do"}
             
+            # Get workspace ID from workspace name
+            DEPLOYMENT_WORKSPACE_ID=\$(curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
+              https://app.terraform.io/api/v2/organizations/CircleCI-Author-Program/workspaces/\$TF_DEPLOYMENT_WS | \
+              jq -r '.data.id')
+            
+            if [ "\$DEPLOYMENT_WORKSPACE_ID" = "null" ] || [ -z "\$DEPLOYMENT_WORKSPACE_ID" ]; then
+              echo "ERROR: Could not find workspace '\$TF_DEPLOYMENT_WS' in organization 'CircleCI-Author-Program'"
+              exit 1
+            fi
+            
+            echo "Found deployment workspace ID: \$DEPLOYMENT_WORKSPACE_ID"
+            
             # Update all Terraform Cloud workspace variables
             # First, handle the regular variables with explicit values
             
             # Update do_token
             VAR_ID=\$(curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
-              https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars | \
+              https://app.terraform.io/api/v2/workspaces/\$DEPLOYMENT_WORKSPACE_ID/vars | \
               jq -r ".data // [] | .[] | select(.attributes.key==\"do_token\") | .id")
             if [ -n "\$VAR_ID" ]; then
               curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
@@ -289,7 +313,7 @@ jobs:
                     }
                   }
                 }' \
-                https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars/\$VAR_ID
+                https://app.terraform.io/api/v2/workspaces/\$DEPLOYMENT_WORKSPACE_ID/vars/\$VAR_ID
             else
               curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
                 --header "Content-Type: application/vnd.api+json" \
@@ -306,12 +330,12 @@ jobs:
                     }
                   }
                 }' \
-                https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars
+                https://app.terraform.io/api/v2/workspaces/\$DEPLOYMENT_WORKSPACE_ID/vars
             fi
             
             # Update cluster_name
             VAR_ID=\$(curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
-              https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars | \
+              https://app.terraform.io/api/v2/workspaces/\$DEPLOYMENT_WORKSPACE_ID/vars | \
               jq -r ".data // [] | .[] | select(.attributes.key==\"cluster_name\") | .id")
             if [ -n "\$VAR_ID" ]; then
               curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
@@ -325,7 +349,7 @@ jobs:
                     }
                   }
                 }' \
-                https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars/\$VAR_ID
+                https://app.terraform.io/api/v2/workspaces/\$DEPLOYMENT_WORKSPACE_ID/vars/\$VAR_ID
             else
               curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
                 --header "Content-Type: application/vnd.api+json" \
@@ -342,12 +366,12 @@ jobs:
                     }
                   }
                 }' \
-                https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars
+                https://app.terraform.io/api/v2/workspaces/\$DEPLOYMENT_WORKSPACE_ID/vars
             fi
             
             # Update docker_image
             VAR_ID=\$(curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
-              https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars | \
+              https://app.terraform.io/api/v2/workspaces/\$DEPLOYMENT_WORKSPACE_ID/vars | \
               jq -r ".data // [] | .[] | select(.attributes.key==\"docker_image\") | .id")
             if [ -n "\$VAR_ID" ]; then
               curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
@@ -361,7 +385,7 @@ jobs:
                     }
                   }
                 }' \
-                https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars/\$VAR_ID
+                https://app.terraform.io/api/v2/workspaces/\$DEPLOYMENT_WORKSPACE_ID/vars/\$VAR_ID
             else
               curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
                 --header "Content-Type: application/vnd.api+json" \
@@ -378,7 +402,7 @@ jobs:
                     }
                   }
                 }' \
-                https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars
+                https://app.terraform.io/api/v2/workspaces/\$DEPLOYMENT_WORKSPACE_ID/vars
             fi
 
             # Now handle the Kubernetes credentials
@@ -397,7 +421,7 @@ jobs:
               esac
               
               VAR_ID=\$(curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
-                https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars | \
+                https://app.terraform.io/api/v2/workspaces/\$DEPLOYMENT_WORKSPACE_ID/vars | \
                 jq -r ".data // [] | .[] | select(.attributes.key==\"\$var\") | .id")
               if [ -n "\$VAR_ID" ]; then
                 # Update existing variable
@@ -414,7 +438,7 @@ jobs:
                       }
                     }
                   }' \
-                  https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars/\$VAR_ID
+                  https://app.terraform.io/api/v2/workspaces/\$DEPLOYMENT_WORKSPACE_ID/vars/\$VAR_ID
               else
                 # Create variable
                 curl -s \
@@ -433,7 +457,7 @@ jobs:
                       }
                     }
                   }' \
-                  https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars
+                  https://app.terraform.io/api/v2/workspaces/\$DEPLOYMENT_WORKSPACE_ID/vars
               fi
             done
       - run:

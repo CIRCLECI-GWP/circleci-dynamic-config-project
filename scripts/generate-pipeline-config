@@ -84,6 +84,84 @@ jobs:
             doctl kubernetes options versions -o json -t \$DIGITAL_OCEAN_TOKEN | jq -r '.[0].slug'
             K8S_SLUG=\$(doctl kubernetes options versions -o json -t \$DIGITAL_OCEAN_TOKEN | jq -r '.[0].slug')
             echo "K8S_SLUG=\$K8S_SLUG"
+            
+            # Update Terraform Cloud workspace variables for iac-do workspace
+            export TF_CLUSTER_WS=\${TF_CLUSTER_WORKSPACE:-"iac-do"}
+            
+            # Update cluster_name variable
+            VAR_ID=\$(curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
+              https://app.terraform.io/api/v2/workspaces/\$TF_CLUSTER_WS/vars | \
+              jq -r ".data // [] | .[] | select(.attributes.key==\"cluster_name\") | .id")
+            if [ -n "\$VAR_ID" ]; then
+              curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
+                --header "Content-Type: application/vnd.api+json" \
+                --request PATCH \
+                --data '{
+                  "data": {
+                    "type":"vars",
+                    "attributes": {
+                       "value":"'"'"'\$CLUSTER_NAME'"'"'"
+                    }
+                  }
+                }' \
+                https://app.terraform.io/api/v2/workspaces/\$TF_CLUSTER_WS/vars/\$VAR_ID
+            else
+              curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
+                --header "Content-Type: application/vnd.api+json" \
+                --request POST \
+                --data '{
+                  "data": {
+                    "type":"vars",
+                    "attributes": {
+                      "key":"cluster_name",
+                      "value":"'"'"'\$CLUSTER_NAME'"'"'",
+                      "category":"terraform",
+                      "hcl":false,
+                      "sensitive":false
+                    }
+                  }
+                }' \
+                https://app.terraform.io/api/v2/workspaces/\$TF_CLUSTER_WS/vars
+            fi
+            
+            # Update do_k8s_slug_ver variable
+            VAR_ID=\$(curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
+              https://app.terraform.io/api/v2/workspaces/\$TF_CLUSTER_WS/vars | \
+              jq -r ".data // [] | .[] | select(.attributes.key==\"do_k8s_slug_ver\") | .id")
+            if [ -n "\$VAR_ID" ]; then
+              curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
+                --header "Content-Type: application/vnd.api+json" \
+                --request PATCH \
+                --data '{
+                  "data": {
+                    "type":"vars",
+                    "attributes": {
+                       "value":"'"'"'\$K8S_SLUG'"'"'"
+                    }
+                  }
+                }' \
+                https://app.terraform.io/api/v2/workspaces/\$TF_CLUSTER_WS/vars/\$VAR_ID
+            else
+              curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
+                --header "Content-Type: application/vnd.api+json" \
+                --request POST \
+                --data '{
+                  "data": {
+                    "type":"vars",
+                    "attributes": {
+                      "key":"do_k8s_slug_ver",
+                      "value":"'"'"'\$K8S_SLUG'"'"'",
+                      "category":"terraform",
+                      "hcl":false,
+                      "sensitive":false
+                    }
+                  }
+                }' \
+                https://app.terraform.io/api/v2/workspaces/\$TF_CLUSTER_WS/vars
+            fi
+            
+            # Wait for variable propagation
+            sleep 10
       - run:
           name: Terraform Apply (remote backend.)
           command: |

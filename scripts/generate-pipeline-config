@@ -1,0 +1,334 @@
+#!/bin/bash 
+set -o pipefail
+
+TF_VERSION=$1 #Terraform CLI Version to install
+DOCTL_VERSION=$2 #Digital Ocean CLI Version to install
+
+mkdir configs/
+cat << EOF > configs/generated_config.yml
+version: 2.1
+orbs:
+  docker: circleci/docker@2.8.2
+  node: circleci/node@7.1.0
+  snyk: snyk/snyk@2.3.0
+  terraform: circleci/terraform@3.6.0
+jobs:
+  scan_app:
+    docker:
+      - image: cimg/node:24.0.2
+    steps:
+      - checkout
+      - node/install-packages:
+          override-ci-command: npm install
+          cache-path: ~/project/node_modules 
+      - snyk/scan:
+          fail-on-issues: false
+          monitor-on-build: false
+  scan_push_docker_image:
+    docker:
+      - image: cimg/node:24.0.2
+    steps:
+      - checkout
+      - setup_remote_docker
+      - docker/check
+      - docker/build:
+          image: \$DOCKER_LOGIN/\$CIRCLE_PROJECT_REPONAME
+          tag: 0.1.<< pipeline.number >>             
+      - snyk/scan:
+          fail-on-issues: false
+          monitor-on-build: false
+          target-file: "Dockerfile"
+          docker-image-name: \$DOCKER_LOGIN/\$IMAGE_NAME:0.1.<< pipeline.number >>
+          project: \${CIRCLE_PROJECT_REPONAME}/\${CIRCLE_BRANCH}-app
+      - docker/push:
+          image: \$DOCKER_LOGIN/\$CIRCLE_PROJECT_REPONAME
+          tag: 0.1.<< pipeline.number >>
+  run_tests:
+    docker:
+      - image: cimg/node:24.0.2
+    steps:
+      - checkout
+      - node/install-packages:
+          override-ci-command: npm install
+          cache-path: ~/project/node_modules
+      - run:
+          name: Run Unit Tests
+          command: |
+            ./node_modules/mocha/bin/mocha test/ --reporter mochawesome --reporter-options reportDir=test-results,reportFilename=test-results
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: test-results
+  create_do_k8s_cluster:
+    docker:
+      - image: cimg/node:24.0.2
+    steps:
+      - checkout
+      - run:
+          name: Create .terraformrc file locally
+          command: echo "credentials \"app.terraform.io\" {token = \"\$TERRAFORM_TOKEN\"}" > \$HOME/.terraformrc   
+      - terraform/install:
+          terraform_version: $TF_VERSION
+          arch: "amd64"
+          os: "linux"
+      - terraform/init:
+          path: ./terraform/do_create_k8s
+      - run:
+          name: Create K8s Cluster on DigitalOcean 
+          command: |
+            export CLUSTER_NAME=\${CIRCLE_PROJECT_REPONAME}
+            export TAG=0.1.<< pipeline.number >>
+            curl -sL https://github.com/digitalocean/doctl/releases/download/v$DOCTL_VERSION/doctl-$DOCTL_VERSION-linux-amd64.tar.gz | tar -xzv
+            sudo mv doctl /usr/local/bin
+            echo "Fetching Kubernetes versions from DigitalOcean..."
+            doctl kubernetes options versions -o json -t \$DIGITAL_OCEAN_TOKEN | jq -r '.[0].slug'
+            K8S_SLUG=\$(doctl kubernetes options versions -o json -t \$DIGITAL_OCEAN_TOKEN | jq -r '.[0].slug')
+            echo "K8S_SLUG=\$K8S_SLUG"
+      - run:
+          name: Terraform Apply (remote backend.)
+          command: |
+            cd terraform/do_create_k8s
+            terraform apply -auto-approve            
+  deploy_to_k8s:
+    docker:
+      - image: cimg/node:24.0.2
+    steps:
+      - checkout
+      - run:
+          name: Create .terraformrc file locally
+          command: echo "credentials \"app.terraform.io\" {token = \"\$TERRAFORM_TOKEN\"}" > \$HOME/.terraformrc
+      - terraform/install:
+          terraform_version: $TF_VERSION
+          arch: "amd64"
+          os: "linux"
+      - terraform/init:
+          path: ./terraform/do_k8s_deploy_app
+      - run:
+          name: Deploy Application to K8s on DigitalOcean 
+          command: |
+            export CLUSTER_NAME=\${CIRCLE_PROJECT_REPONAME}
+            export TAG=0.1.<< pipeline.number >>
+            export DOCKER_IMAGE="\${DOCKER_LOGIN}/\${CIRCLE_PROJECT_REPONAME}:\$TAG"
+
+            # Install doctl
+            curl -sL https://github.com/digitalocean/doctl/releases/download/v$DOCTL_VERSION/doctl-$DOCTL_VERSION-linux-amd64.tar.gz | tar -xzv
+            sudo mv doctl /usr/local/bin
+
+
+            # Install kubectl
+            curl -LO "https://storage.googleapis.com/kubernetes-release/release/\$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+            chmod +x kubectl
+            sudo mv kubectl /usr/local/bin     
+
+            # Authenticate with DigitalOcean   
+            doctl auth init -t \$DIGITAL_OCEAN_TOKEN
+            doctl kubernetes cluster kubeconfig save \$CLUSTER_NAME
+            export KUBECONFIG=\$HOME/.kube/config
+
+            # Create the service account if it doesn't exist
+            if ! kubectl get serviceaccount tf-admin -n kube-system >/dev/null 2>&1; then
+              kubectl create serviceaccount tf-admin -n kube-system
+            fi
+
+            # Create the clusterrolebinding if it doesn't exist
+            if ! kubectl get clusterrolebinding tf-admin-binding >/dev/null 2>&1; then
+              kubectl create clusterrolebinding tf-admin-binding --clusterrole=cluster-admin --serviceaccount=kube-system:tf-admin
+            fi
+
+            # Create a secret for the service account token if it doesn't exist
+            if ! kubectl get secret tf-admin-token -n kube-system >/dev/null 2>&1; then
+              kubectl create secret generic tf-admin-token \
+                --namespace kube-system \
+                --type kubernetes.io/service-account-token \
+                --dry-run=client -o yaml | \
+              kubectl annotate -f - kubernetes.io/service-account.name=tf-admin --local -o yaml | \
+              kubectl apply -f -  
+            fi
+
+            # Wait for the token to be populated in the secret
+            for i in {1..10}; do
+              K8S_CLUSTER_TOKEN=\$(kubectl get secret tf-admin-token -n kube-system -o jsonpath='{.data.token}' 2>/dev/null | base64 --decode)
+              if [ -n "\$K8S_CLUSTER_TOKEN" ]; then
+                break
+              fi
+              echo "Waiting for tf-admin-token secret to be populated..."
+              sleep 2
+            done
+
+            if [ -z "\$K8S_CLUSTER_TOKEN" ]; then
+              echo "ERROR: tf-admin-token secret not found or token not populated!"
+              exit 1
+            fi         
+
+            # Extract Kubernetes Cluster Information
+            export K8S_CLUSTER_ENDPOINT=\$(kubectl config view -o jsonpath='{.clusters[0].cluster.server}')
+            export K8S_CLUSTER_CA_CERTIFICATE=\$(kubectl config view --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
+
+            # Print for verification
+            echo "KUBECONFIG is \$KUBECONFIG"
+            ls -l \$KUBECONFIG
+            cat \$KUBECONFIG
+            kubectl config current-context
+            kubectl get nodes
+            kubectl cluster-info
+
+            # Print K8s credentials for verification
+            echo "K8S_CLUSTER_ENDPOINT: \$K8S_CLUSTER_ENDPOINT"
+            echo "K8S_CLUSTER_CA_CERTIFICATE: \$K8S_CLUSTER_CA_CERTIFICATE"
+            echo "K8S_CLUSTER_TOKEN: \$K8S_CLUSTER_TOKEN"
+
+            # Export to Terraform environment variables
+            export TF_VAR_k8s_cluster_endpoint="\$K8S_CLUSTER_ENDPOINT"
+            export TF_VAR_k8s_cluster_ca_certificate="\$K8S_CLUSTER_CA_CERTIFICATE"
+            export TF_VAR_k8s_cluster_token="\$K8S_CLUSTER_TOKEN"
+
+            # Print for verification
+            echo "TF_VAR_k8s_cluster_endpoint: \$TF_VAR_k8s_cluster_endpoint"
+            echo "TF_VAR_k8s_cluster_ca_certificate: \$TF_VAR_k8s_cluster_ca_certificate"
+            echo "TF_VAR_k8s_cluster_token: \$TF_VAR_k8s_cluster_token"
+
+
+            for var in k8s_cluster_endpoint k8s_cluster_token k8s_cluster_ca_certificate; do
+              VALUE=\$(eval echo \$$var)
+              VAR_ID=\$(curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
+                https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars | \
+                jq -r ".data // [] | .[] | select(.attributes.key==\"\$var\") | .id")
+              if [ -n "\$VAR_ID" ]; then
+                # Update existing variable
+                curl -s \
+                  --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
+                  --header "Content-Type: application/vnd.api+json" \
+                  --request PATCH \
+                  --data '{
+                    "data": {
+                      "type":"vars",
+                      "attributes": {
+                         "value":"'"'"'\$VALUE'"'"'"
+                      }
+                    }
+                  }' \
+                  https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars/\$VAR_ID
+              else
+                # Create variable
+                curl -s \
+                  --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
+                  --header "Content-Type: application/vnd.api+json" \
+                  --request POST \
+                  --data '{
+                    "data": {
+                      "type":"vars",
+                      "attributes": {
+                        "key":"'"'"'\$var'"'"'",
+                        "value":"'"'"'\$VALUE'"'"'",
+                        "category":"terraform",
+                        "hcl":false,
+                        "sensitive":false
+                      }
+                    }
+                  }' \
+                  https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars
+              fi
+            done
+      - run:
+          name: Wait for TFC variable propagation
+          command: sleep 20
+  remote_terraform_apply:
+    docker:
+      - image: cimg/node:24.0.2
+    steps:
+      - checkout
+      - run:
+          name: Create .terraformrc file locally
+          command: echo "credentials \"app.terraform.io\" {token = \"\$TERRAFORM_TOKEN\"}" > \$HOME/.terraformrc
+      - terraform/install:
+          terraform_version: $TF_VERSION
+          arch: "amd64"
+          os: "linux"
+      - terraform/init:
+          path: ./terraform/do_k8s_deploy_app
+      - run:
+          name: Terraform Apply (remote backend)
+          command: |
+            cd terraform/do_k8s_deploy_app
+            terraform apply -auto-approve
+            
+            # Save the Load Balancer Public IP Address
+            export ENDPOINT="\$(terraform output lb_public_ip)"
+            mkdir -p /tmp/do_k8s
+            echo 'export ENDPOINT='\${ENDPOINT} > /tmp/do_k8s/dok8s-endpoint
+      - persist_to_workspace:
+          root: /tmp/do_k8s
+          paths:
+            - "*"         
+  smoketest_k8s_deployment:
+    docker:
+      - image: cimg/node:24.0.2
+    steps:
+      - checkout
+      - attach_workspace:
+          at: /tmp/do_k8s/
+      - run:
+          name: Smoke Test K8s App Deployment.
+          command: |
+            source /tmp/do_k8s/dok8s-endpoint
+            ./test/smoke_test \$ENDPOINT              
+  destroy_k8s_cluster:
+    docker:
+      - image: cimg/node:24.0.2
+    steps:
+      - checkout
+      - run:
+          name: Create .terraformrc file locally
+          command: echo "credentials \"app.terraform.io\" {token = \"\$TERRAFORM_TOKEN\"}" > \$HOME/.terraformrc && cat \$HOME/.terraformrc
+      - terraform/install:
+          terraform_version: $TF_VERSION
+          arch: "amd64"
+          os: "linux"
+      - terraform/init:
+          path: ./terraform/do_k8s_deploy_app
+      - run:
+          name: Destroy App Deployment 
+          command: |
+            export CLUSTER_NAME=\${CIRCLE_PROJECT_REPONAME}
+            export TAG=0.1.<< pipeline.number >>
+            export DOCKER_IMAGE="\${DOCKER_LOGIN}/\${CIRCLE_PROJECT_REPONAME}:\$TAG"
+            curl -sL https://github.com/digitalocean/doctl/releases/download/v$DOCTL_VERSION/doctl-$DOCTL_VERSION-linux-amd64.tar.gz | tar -xzv
+            sudo mv doctl /usr/local/bin
+            cd terraform/do_k8s_deploy_app/
+            doctl auth init -t \$DIGITAL_OCEAN_TOKEN
+            doctl kubernetes cluster kubeconfig save \$CLUSTER_NAME
+            terraform destroy -auto-approve
+      - terraform/init:
+          path: ./terraform/do_create_k8s/ 
+      - run:
+          name: Destroy K8s Cluster.
+          command: |
+            export CLUSTER_NAME=\${CIRCLE_PROJECT_REPONAME}
+            export TAG=0.1.<< pipeline.number >>
+            cd terraform/do_create_k8s/
+            terraform destroy -auto-approve
+workflows:
+  scan_deploy:
+    jobs:
+      - scan_app
+      - scan_push_docker_image
+      - run_tests
+      - create_do_k8s_cluster
+      - deploy_to_k8s:
+          requires:
+            - create_do_k8s_cluster
+            - scan_push_docker_image
+      - remote_terraform_apply:
+          requires:
+            - deploy_to_k8s
+      - smoketest_k8s_deployment:
+          requires:
+            - remote_terraform_apply
+      - approve_destroy:
+          type: approval
+          requires:
+            - smoketest_k8s_deployment
+      - destroy_k8s_cluster:
+          requires:
+            - approve_destroy
+EOF

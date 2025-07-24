@@ -252,7 +252,7 @@ jobs:
 
             # Extract Kubernetes Cluster Information
             export K8S_CLUSTER_ENDPOINT=\$(kubectl config view -o jsonpath='{.clusters[0].cluster.server}')
-            export K8S_CLUSTER_CA_CERTIFICATE=\$(kubectl config view --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
+            export K8S_CLUSTER_CA_CERTIFICATE=\$(kubectl config view --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' | base64 --decode)
 
             # Print for verification
             echo "KUBECONFIG is \$KUBECONFIG"

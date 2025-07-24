@@ -27,6 +27,9 @@ data "digitalocean_kubernetes_cluster" "do_cluster" {
   name = var.cluster_name
 }
 
+provider "digitalocean" {
+  token = var.do_token
+}
 
 provider "kubernetes" {
   host                   = var.k8s_cluster_endpoint

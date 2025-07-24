@@ -94,5 +94,6 @@ plan.txt
 website/vendor
 namecheap.tf
 cicd_demo_gcp_creds.json
+configs/
 generated_config.yml
 *.pyc

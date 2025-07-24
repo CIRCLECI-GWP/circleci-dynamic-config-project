@@ -1,4 +1,4 @@
-FROM node:12
+FROM node:24-alpine
 
 # Create app directory
 WORKDIR /usr/src/app
@@ -8,12 +8,20 @@ WORKDIR /usr/src/app
 # where available (npm@5+)
 COPY package*.json ./
 
-RUN npm install --only=production
-# If you are building your code for production
-# RUN npm install --only=production
+RUN npm ci --only=production && npm cache clean --force
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
 
 # Bundle app source
 COPY . .
 
+# Change ownership to nodejs user
+RUN chown -R nodejs:nodejs /usr/src/app
+USER nodejs
+
 EXPOSE 5000
-CMD [ "npm", "start" ]
+
+# Use node command directly instead of npm for better signal handling
+CMD [ "node", "app.js" ]

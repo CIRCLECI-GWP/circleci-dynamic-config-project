@@ -188,8 +188,136 @@ jobs:
             echo "TF_VAR_k8s_cluster_token: \$TF_VAR_k8s_cluster_token"
 
 
+            # Export all required variables for the deployment workspace
+            export TF_DEPLOYMENT_WS=\${TF_DEPLOYMENT_WORKSPACE:-"deploy-iac-do"}
+            
+            # Update all Terraform Cloud workspace variables
+            # First, handle the regular variables with explicit values
+            
+            # Update do_token
+            VAR_ID=\$(curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
+              https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars | \
+              jq -r ".data // [] | .[] | select(.attributes.key==\"do_token\") | .id")
+            if [ -n "\$VAR_ID" ]; then
+              curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
+                --header "Content-Type: application/vnd.api+json" \
+                --request PATCH \
+                --data '{
+                  "data": {
+                    "type":"vars",
+                    "attributes": {
+                       "value":"'"'"'\$DIGITAL_OCEAN_TOKEN'"'"'",
+                       "sensitive": true
+                    }
+                  }
+                }' \
+                https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars/\$VAR_ID
+            else
+              curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
+                --header "Content-Type: application/vnd.api+json" \
+                --request POST \
+                --data '{
+                  "data": {
+                    "type":"vars",
+                    "attributes": {
+                      "key":"do_token",
+                      "value":"'"'"'\$DIGITAL_OCEAN_TOKEN'"'"'",
+                      "category":"terraform",
+                      "hcl":false,
+                      "sensitive":true
+                    }
+                  }
+                }' \
+                https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars
+            fi
+            
+            # Update cluster_name
+            VAR_ID=\$(curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
+              https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars | \
+              jq -r ".data // [] | .[] | select(.attributes.key==\"cluster_name\") | .id")
+            if [ -n "\$VAR_ID" ]; then
+              curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
+                --header "Content-Type: application/vnd.api+json" \
+                --request PATCH \
+                --data '{
+                  "data": {
+                    "type":"vars",
+                    "attributes": {
+                       "value":"'"'"'\$CLUSTER_NAME'"'"'"
+                    }
+                  }
+                }' \
+                https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars/\$VAR_ID
+            else
+              curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
+                --header "Content-Type: application/vnd.api+json" \
+                --request POST \
+                --data '{
+                  "data": {
+                    "type":"vars",
+                    "attributes": {
+                      "key":"cluster_name",
+                      "value":"'"'"'\$CLUSTER_NAME'"'"'",
+                      "category":"terraform",
+                      "hcl":false,
+                      "sensitive":false
+                    }
+                  }
+                }' \
+                https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars
+            fi
+            
+            # Update docker_image
+            VAR_ID=\$(curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
+              https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars | \
+              jq -r ".data // [] | .[] | select(.attributes.key==\"docker_image\") | .id")
+            if [ -n "\$VAR_ID" ]; then
+              curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
+                --header "Content-Type: application/vnd.api+json" \
+                --request PATCH \
+                --data '{
+                  "data": {
+                    "type":"vars",
+                    "attributes": {
+                       "value":"'"'"'\$DOCKER_IMAGE'"'"'"
+                    }
+                  }
+                }' \
+                https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars/\$VAR_ID
+            else
+              curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
+                --header "Content-Type: application/vnd.api+json" \
+                --request POST \
+                --data '{
+                  "data": {
+                    "type":"vars",
+                    "attributes": {
+                      "key":"docker_image",
+                      "value":"'"'"'\$DOCKER_IMAGE'"'"'",
+                      "category":"terraform",
+                      "hcl":false,
+                      "sensitive":false
+                    }
+                  }
+                }' \
+                https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars
+            fi
+
+            # Now handle the Kubernetes credentials
             for var in k8s_cluster_endpoint k8s_cluster_token k8s_cluster_ca_certificate; do
-              VALUE=\$(eval echo \$$var)
+              # Map the variable names to their actual values
+              case \$var in
+                k8s_cluster_endpoint)
+                  VALUE="\$K8S_CLUSTER_ENDPOINT"
+                  ;;
+                k8s_cluster_token)
+                  VALUE="\$K8S_CLUSTER_TOKEN"
+                  ;;
+                k8s_cluster_ca_certificate)
+                  VALUE="\$K8S_CLUSTER_CA_CERTIFICATE"
+                  ;;
+              esac
+              
               VAR_ID=\$(curl -s --header "Authorization: Bearer \$TERRAFORM_TOKEN" \
                 https://app.terraform.io/api/v2/workspaces/\$TF_DEPLOYMENT_WS/vars | \
                 jq -r ".data // [] | .[] | select(.attributes.key==\"\$var\") | .id")
@@ -203,7 +331,8 @@ jobs:
                     "data": {
                       "type":"vars",
                       "attributes": {
-                         "value":"'"'"'\$VALUE'"'"'"
+                         "value":"'"'"'\$VALUE'"'"'",
+                         "sensitive": true
                       }
                     }
                   }' \
@@ -222,7 +351,7 @@ jobs:
                         "value":"'"'"'\$VALUE'"'"'",
                         "category":"terraform",
                         "hcl":false,
-                        "sensitive":false
+                        "sensitive":true
                       }
                     }
                   }' \
@@ -292,6 +421,7 @@ jobs:
             export CLUSTER_NAME=\${CIRCLE_PROJECT_REPONAME}
             export TAG=0.1.<< pipeline.number >>
             export DOCKER_IMAGE="\${DOCKER_LOGIN}/\${CIRCLE_PROJECT_REPONAME}:\$TAG"
+            export TF_DEPLOYMENT_WS=\${TF_DEPLOYMENT_WORKSPACE:-"deploy-iac-do"}
             curl -sL https://github.com/digitalocean/doctl/releases/download/v$DOCTL_VERSION/doctl-$DOCTL_VERSION-linux-amd64.tar.gz | tar -xzv
             sudo mv doctl /usr/local/bin
             cd terraform/do_k8s_deploy_app/

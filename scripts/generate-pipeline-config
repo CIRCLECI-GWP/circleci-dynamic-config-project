@@ -252,7 +252,8 @@ jobs:
 
             # Extract Kubernetes Cluster Information
             export K8S_CLUSTER_ENDPOINT=\$(kubectl config view -o jsonpath='{.clusters[0].cluster.server}')
-            export K8S_CLUSTER_CA_CERTIFICATE=\$(kubectl config view --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' | base64 --decode)
+            # Keep the certificate in base64 format as expected by the Kubernetes provider
+            export K8S_CLUSTER_CA_CERTIFICATE=\$(kubectl config view --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
 
             # Print for verification
             echo "KUBECONFIG is \$KUBECONFIG"
@@ -262,10 +263,10 @@ jobs:
             kubectl get nodes
             kubectl cluster-info
 
-            # Print K8s credentials for verification
+            # Print K8s credentials for verification (hiding sensitive data)
             echo "K8S_CLUSTER_ENDPOINT: \$K8S_CLUSTER_ENDPOINT"
-            echo "K8S_CLUSTER_CA_CERTIFICATE: \$K8S_CLUSTER_CA_CERTIFICATE"
-            echo "K8S_CLUSTER_TOKEN: \$K8S_CLUSTER_TOKEN"
+            echo "K8S_CLUSTER_CA_CERTIFICATE (first 100 chars): \${K8S_CLUSTER_CA_CERTIFICATE:0:100}..."
+            echo "K8S_CLUSTER_TOKEN (length): \${#K8S_CLUSTER_TOKEN}"
 
             # Export to Terraform environment variables
             export TF_VAR_k8s_cluster_endpoint="\$K8S_CLUSTER_ENDPOINT"
